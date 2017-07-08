@@ -13,7 +13,7 @@
 }
 
 </style>
-<svg width="2400" height="1500"></svg>
+<svg width="1600" height="1600"></svg>
 <script src="d3/d3.js"></script>
 <script>
 
@@ -24,26 +24,96 @@ var svg = d3.select("svg"),
 var color = d3.scaleOrdinal(d3.schemeCategory20);
 
 var simulation = d3.forceSimulation()
-    .force("link", d3.forceLink().id(function(d) { return d.id; }))
-    .force("charge", d3.forceManyBody().strength(-800))
+    .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(500).strength(0.3))
+    //.force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("charge", d3.forceManyBody().strength(-600))
     .force("center", d3.forceCenter(width / 2, height / 2));
 
 
   d3.json("bpic2012_network.json", function(error, graph) {
-  if (error) throw error;
+      if (error) return console.log(error);
+
+
+  var nodes_degree = new Array();  //nodes的度数(包含入度与出度)组,下面用数组实现字典
+  var node_count=0;   //node计数器node_count
+  for (var id_index in graph.nodes){
+      node_count++;
+      var str = graph.nodes[id_index].id;
+      //console.log(str);
+      nodes_degree[str]=0;
+  }
+  //console.log(node_count);
+
+  
 
 
 
   //变换source和target下标对应的值
   var source;
   var target;
+  var weight_min=10;  //查看weight最大值
+  var weight_max=0;   //查看weight最小值
+
+  //调试而已 
+  // for(var node_index in graph.nodes){
+  //   if(graph.nodes[node_index].id==10125){
+  //     console.log(node_index);
+  //     console.log("ssssss");
+  //   }
+  // }
+
   for (var link_index in graph.links){
     source = graph.links[link_index].source;
     target = graph.links[link_index].target;
     graph.links[link_index].source = graph.nodes[source].id;
     graph.links[link_index].target = graph.nodes[target].id;
-  }
 
+    //调试而已    
+    // if(graph.links[link_index].source==10125){
+    //   console.log("10125source")
+    // }
+    // if(graph.links[link_index].target==10125){
+    //   console.log("10125target")
+    // }
+
+    //nodes的出度
+    nodes_degree[graph.nodes[source].id]++;
+    //nodes的入度
+    nodes_degree[graph.nodes[target].id]++;
+
+   
+    if(graph.links[link_index].weight>weight_max){
+        weight_max=graph.links[link_index].weight;
+    }
+    if(graph.links[link_index].weight<weight_min){
+        weight_min=graph.links[link_index].weight;
+    }
+
+  }
+  //console.log(weight_max);
+  //console.log(weight_min);
+
+  //调试
+  // for (var id_index in nodes_degree){
+  //     console.log(nodes_degree[id_index]);
+  // }
+  //console.log(nodes_degree[10125]);
+
+  //估算weight的最大值是2的多少次方
+  var times=Math.ceil(Math.log2(weight_max));
+  //console.log(times);
+
+  //颜色库
+  var colors = new Array("#FFECEC","#FFD2D2","#FFB5B5","#FF9797","#FF2D2D","#EA0000 ","#AE0000","#750000","#4D0000","#2F0000","#000000");
+  //link的颜色数组
+  var link_colors=new Array(times);
+  for(var i=0;i<times;i++){
+    if(i<colors.length){
+      link_colors[i]=colors[i];
+    } else {
+      link_colors[i]=colors[colors.length-1];
+    }
+  }
 
 
   var link = svg.append("g")
@@ -51,7 +121,20 @@ var simulation = d3.forceSimulation()
     .selectAll("line")
     .data(graph.links)
     .enter().append("line")
-    .attr("stroke-width", function(d) { return Math.sqrt(d.weight)/10; });
+    .attr("stroke-width", function(d) {
+      //console.log(d.source);
+      return Math.ceil(Math.log2(d.weight))/5;
+    });
+    
+    link.style("stroke", function(d) {
+      if(d.weight>1){
+        return link_colors[Math.ceil(Math.log2(d.weight))];
+      }
+      else{
+        return link_colors[0];
+      }
+    });
+
     link.append("title")
     .text(function(d) { return d.weight; });
 
@@ -61,21 +144,77 @@ var simulation = d3.forceSimulation()
      .enter()
      .append('g')
      .classed('gnode', true);
-    
+  
+
   var node = gnodes.append("circle")
       .attr("class", "nodes")
-      .attr("r", 15)
+      //.attr("r", 5)
+      .attr("r", function(d){
+        return nodes_degree[d.id]/5;
+       })
       .style("fill", function(d) { return color(d.id); })
       .call(d3.drag()
        .on("start", dragstarted)
        .on("drag", dragged)
        .on("end", dragended));
 
-  gnodes.append("text")
-      .attr("x",12)
-      .attr("dy",".35em")
+       var gn = gnodes.append("text")
+      .attr("x",10)
+      .attr("dy","0.200em")
+      .attr("stroke-width",20)
+      .style("fill", function(d) { return color(d.id); })
       .text(function(d) { return d.id; });
 
+       node.on("click",function (d){
+           var bind_node = new Array();     //与点相邻的点
+           var bind_node_index= 0;
+           bind_node[bind_node_index]=d.id;
+           link.style("opacity",function(edge){    //不与点相连的边(既不是出边也不是入边)透明
+            if(edge.source.id == d.id){
+              //console.log("source");
+              bind_node_index++;
+              bind_node[bind_node_index]=edge.target.id;    //找目标点
+              return 1.0;
+            } else if(edge.target.id == d.id){
+              //console.log("target");
+              bind_node_index++;
+              bind_node[bind_node_index]=edge.source.id;    //找出发点
+              return 1.0;
+            } else {
+              return 0.0;
+            }
+           });
+
+            node.style("opacity",function(node_d){
+              if(bind_node.includes(node_d.id)){
+                return 1.0;
+              } else {
+                return 0.0;
+              }
+           }
+           );
+
+           gn.style("opacity",function(node_d){
+              if(bind_node.includes(node_d.id)){
+                return 1.0;
+              } else {
+                return 0.0;
+              }
+           }
+           );
+
+        })
+
+
+       node.on("dblclick",function (d){
+          //双击开始后设定被拖拽对象为不固定
+          d.fx=null;
+          d.fy=null;
+          //恢复全图
+           link.style("opacity",1.0);
+           node.style("opacity",1.0);
+           gn.style("opacity",1.0);
+        });
 
 
   simulation
@@ -88,6 +227,7 @@ var simulation = d3.forceSimulation()
 
 
   function ticked() {
+
     link.attr("x1", function(d) { return d.source.x; })
         .attr("y1", function(d) { return d.source.y; })
         .attr("x2", function(d) { return d.target.x; })
@@ -102,20 +242,27 @@ var simulation = d3.forceSimulation()
 
 
 function dragstarted(d) {
+
   if (!d3.event.active) simulation.alphaTarget(0.3).restart();
   d.fx = d.x;
   d.fy = d.y;
+  
 }
 
 function dragged(d) {
   d.fx = d3.event.x;
   d.fy = d3.event.y;
+  
 }
 
 function dragended(d) {
   if (!d3.event.active) simulation.alphaTarget(0);
-  d.fx = null;
-  d.fy = null;
+  //拖拽开始后设定被拖拽对象为固定
+  //d.fx = null;
+  //d.fy = null;
+  //d3.select(this).classed("fixed",d.fixed=true); //此句代码不起作用
+
 }
+
 
 </script>
