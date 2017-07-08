@@ -12,8 +12,37 @@
   stroke-width: 1.5px;
 }
 
+/*label {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  position: absolute;
+  left: 10px;
+  top: 10px;
+}*/
+
 </style>
+
 <svg width="1600" height="1600"></svg>
+
+  <label for="LS_range"
+         style="display: inline-block; width: 120px; text-align: right">
+         Link Strength = <span id="LS_range_value"> </span>
+  </label>
+
+<label><input style="width:200px;" type="range" min="0" max="1" id="LS_range" step="any" value="0.3"></label>
+
+  <label for="LD_range"
+         style="display: inline-block; width: 120px; text-align: right">
+         Link Distance = <span id="LD_range_value"> </span>
+  </label>
+<label><input style="width:200px;" type="range" min="0" max="1000" id="LD_range" step="any" value="500"></label>
+
+  <label for="LD_range"
+         style="display: inline-block; width: 120px; text-align: right">
+         Charge Strength= <span id="CS_range_value"> </span>
+  </label>
+<label><input style="width:200px;" type="range" min="-1300" max="100" id="CS_range" step="any" value="-600"></label>
+
+
 <script src="d3/d3.js"></script>
 <script>
 
@@ -28,6 +57,13 @@ var simulation = d3.forceSimulation()
     //.force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", d3.forceManyBody().strength(-600))
     .force("center", d3.forceCenter(width / 2, height / 2));
+
+d3.select("#LS_range")
+    .on("input", inputted_ls);
+d3.select("#LD_range")
+    .on("input", inputted_ld);
+d3.select("#CS_range")
+    .on("input", inputted_cs);
 
 
   d3.json("bpic2012_network.json", function(error, graph) {
@@ -264,5 +300,22 @@ function dragended(d) {
 
 }
 
+function inputted_ls() {
+  d3.select("#LS_range_value").text(+this.value);
+  simulation.force("link").strength(+this.value);
+  simulation.alpha(1).restart();
+}
+
+function inputted_ld() {
+  d3.select("#LD_range_value").text(+this.value);
+  simulation.force("link").distance(+this.value);
+  simulation.alpha(1).restart();
+}
+
+function inputted_cs() {
+  d3.select("#CS_range_value").text(+this.value);
+  simulation.force("charge").strength(+this.value);
+  simulation.alpha(1).restart();
+}
 
 </script>
